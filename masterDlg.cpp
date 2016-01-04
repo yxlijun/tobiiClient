@@ -42,61 +42,6 @@ CCriticalSection m_crit;
 //线程入口
 
 //接收学生实时画面数据，展示
-DWORD WINAPI RealProc(LPVOID lpParameter)
-{
-	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
-	CmasterDlg *pWnd = tp->ceye;
-	string serveripport = tp->Realip;
-
-	void *context = zmq_init(1);
-	void *subscriber = zmq_socket(context, ZMQ_SUB);
-	zmq_connect(subscriber, serveripport.c_str());
-
-	//  设置订阅信息，默认为空字符串，接受全部消息，不过滤
-	string empty;
-	zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, empty.c_str(), empty.length());
-	//int sndhwm = 0;
-	//zmq_setsockopt(subscriber, zmq_rcvhwm, &sndhwm, sizeof(int));
-	while (true)
-	{
-		char *re = new char[realsize];
-		int len = zmq_recv(subscriber, re, realsize, 0);
-		//*(re + 3888000) = 0;
-
-		cv::Mat data_mat = cv::Mat(mathight, matwidth, CV_8UC4, (void *)re);
-
-		//cv::imshow("12345", data_mat);
-		//cv::waitKey(0);
-
-		//free(re);不能再这里free，不然释放了data_mat的内存，因为mat和re都指向了同一片内存
-
-		//获得pic设备相关类
-		CDC* pEyeDC = pWnd->GetDlgItem(IDC_STATIC_REAL)->GetDC();
-		//获得设备句柄
-		HDC	 hEyeDC = pEyeDC->GetSafeHdc();
-
-		//获得pic Rect
-		CRect Eyerc;
-		pWnd->GetDlgItem(IDC_STATIC_REAL)->GetWindowRect(&Eyerc);
-
-		CImage eyeCimg;
-		pWnd->Mat2CImage(data_mat, eyeCimg);
-		if (!eyeCimg.IsNull())
-		{
-			//Mat输出到pic
-			pWnd->DisplayImage(hEyeDC, Eyerc, eyeCimg);
-		}
-
-		//释放Mat和设备相关类
-		eyeCimg.Destroy();
-		pWnd->ReleaseDC(pEyeDC);
-
-		free(re);
-	}
-
-	zmq_close(subscriber);
-	zmq_term(context);
-}
 
 DWORD WINAPI EyeProc(LPVOID lpParameter)
 {
@@ -437,26 +382,21 @@ void CmasterDlg::OnBnClickedOk()
 	string sIPb = std::to_string(usIPb);
 	string sIPc = std::to_string(usIPc);
 	string sIPd = std::to_string(usIPd);
-	string Realport = std::to_string(m_Port);
+	//string Realport = std::to_string(m_Port);
 	string Eyeport = std::to_string(m_Port + 1);
 	string Pptport = std::to_string(m_Port + 2);
 
-	string serveripRealprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Realport;
+	//string serveripRealprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Realport;
 	string serveripEyeprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Eyeport;
 	string serveripPptprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Pptport;
 	string serveripKeyprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":5555";
-
-	//string serveripRealprot = "tcp://localhost:" + Realport;
-	//string serveripEyeprot = "tcp://localhost:" + Eyeport;
-	//string serveripPptprot = "tcp://localhost:" + Pptport;
-	//string serveripKeyprot = "tcp://localhost:5555";
 
 	//将对话框的对象指针CeyeDlg作为参数传入给线程
 	tp.ceye = this;
 
 	//在这里创建4个线程，分别接收key, real，eye和ppt数据，注意参数tp成员不能共享，只用一个ip是错的。
-	tp.Realip = serveripRealprot;
-	HANDLE hThread_1 = CreateThread(NULL, 0, RealProc, &tp, 0, NULL);
+	//tp.Realip = serveripRealprot;
+	//HANDLE hThread_1 = CreateThread(NULL, 0, RealProc, &tp, 0, NULL);
 
 	tp.Eyeip = serveripEyeprot;
 	HANDLE hThread_2 = CreateThread(NULL, 0, EyeProc, &tp, 0, NULL);
