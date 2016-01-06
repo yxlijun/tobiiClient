@@ -63,60 +63,78 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 	////cv::resize(i,eyeImage,cv::Size(1440,900));
 	//i.copyTo(eyeImage);
 	CSingleLock lock(&m_crit);
+	int innum = 0;
+	vector<int> inx(10);
+	vector<int> iny(10);
 	while (true)
 	{
 		int gx=0, gy=0;
 
 		char *re = s_recv(subscriber);
-		//char *re=new char[3888001];
-		//int len = zmq_recv(subscriber, re, 3888000, 0);
-		//*(re + 3888000) = 0;
 
-		//cv::Mat data_mat = cv::Mat(900, 1440, CV_8UC3, (void *)re);
-		//cv::Mat data_mat(vectordata, true);
-		//cv::Mat image = (cv::imdecode(data_mat, 1)); //put 0 if you want greyscale
-		//cv::imshow("12345", data_mat);
-		//cv::waitKey(0);
-		//string str;
-		//sscanf(re, "%s", &str);
-		//string sss;
 		sscanf(re, "%d %d", &gx, &gy);
 		TRACE("gx: %d\n", gx);
 		free(re);
 
-		//获得pic设备相关类
-		CDC* pEyeDC = pWnd->GetDlgItem(IDC_STATIC_PPT)->GetDC();
-		//获得设备句柄
-		HDC	 hEyeDC = pEyeDC->GetSafeHdc();
+		inx.push_back(gx);
+		iny.push_back(gy);
 
-		//获得pic Rect
-		CRect Eyerc;
-		pWnd->GetDlgItem(IDC_STATIC_PPT)->GetWindowRect(&Eyerc);
+		innum++;
+		TRACE("innum: %d\r\n", innum);
 
-		//在Mat上画屏幕点
-		//DrawAttentionPicture(eyeImage, pWnd->screendc.screenW, pWnd->screendc.screenH);
-		cv::Point eyeAttentionTmp(gx, gy);
-
-		CImage eyeCimg;
-
-		lock.Lock();
-		if (lock.IsLocked())
+		if (innum == 10)
 		{
-			circle(eyeImage, eyeAttentionTmp, 6, cv::Scalar(255, 0, 0), 6);
+			TRACE("innum == 10");
+			innum = 0;
 
-			pWnd->Mat2CImage(eyeImage, eyeCimg);
-			lock.Unlock();
-		}
-		
-		if (!eyeCimg.IsNull())
-		{
-			//Mat输出到pic
-			pWnd->DisplayImage(hEyeDC, Eyerc, eyeCimg);
-		}
+			int sumx = 0;
+			int sumy = 0;
+			for (size_t i = 0; i < 10; i++)
+			{
+				sumx += inx[i];
+				sumy += iny[i];
+			}
 
-		//释放Mat和设备相关类
-		eyeCimg.Destroy();
-		pWnd->ReleaseDC(pEyeDC);
+			inx.clear();
+			iny.clear();
+
+			gx = sumx / 10;
+			gy = sumy / 10;
+
+			//获得pic设备相关类
+			CDC* pEyeDC = pWnd->GetDlgItem(IDC_STATIC_PPT)->GetDC();
+			//获得设备句柄
+			HDC	 hEyeDC = pEyeDC->GetSafeHdc();
+
+			//获得pic Rect
+			CRect Eyerc;
+			pWnd->GetDlgItem(IDC_STATIC_PPT)->GetWindowRect(&Eyerc);
+
+			//在Mat上画屏幕点
+			//DrawAttentionPicture(eyeImage, pWnd->screendc.screenW, pWnd->screendc.screenH);
+			cv::Point eyeAttentionTmp(gx, gy);
+
+			CImage eyeCimg;
+
+			lock.Lock();
+			if (lock.IsLocked())
+			{
+				circle(eyeImage, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 6);
+
+				pWnd->Mat2CImage(eyeImage, eyeCimg);
+				lock.Unlock();
+			}
+
+			if (!eyeCimg.IsNull())
+			{
+				//Mat输出到pic
+				pWnd->DisplayImage(hEyeDC, Eyerc, eyeCimg);
+			}
+
+			//释放Mat和设备相关类
+			eyeCimg.Destroy();
+			pWnd->ReleaseDC(pEyeDC);
+		}
 
 	}
 
