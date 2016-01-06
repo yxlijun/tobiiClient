@@ -30,6 +30,13 @@ using namespace std;
 #define ppthight2 340
 #define pptwidth2 600
 
+const int MouseMoveMessege = 512;
+const int MouseLeftDownMessege = 513;
+const int MouseLeftUpMessege = 514;
+const int MouseRightDownMessege = 516;
+const int MouseRightUpMessege = 517;
+const int KeyDownMessege = 256;
+
 //ÊÓÏßÍ¼Æ¬
 cv::Mat eyeImage;
 
@@ -212,12 +219,13 @@ DWORD WINAPI KeyProc(LPVOID lpParameter)
 	while (true)
 	{
 		char str[20];
-		int key=0;
+		int key1 = 0;
+		int key2 = 0;
 		char *re = s_recv(subscriber);
 
-		sscanf(re, "%d %s", &key, &str);
+		sscanf(re, "%d %d %s", &key1, &key2, &str);
 		CString keyname(str);
-		if (key == -1)
+		if (key1 == KeyDownMessege)
 		{
 			pWnd->putkeyname.SetWindowTextW(keyname);
 			//pWnd->UpdateData(FALSE);
