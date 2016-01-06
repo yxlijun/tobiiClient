@@ -48,6 +48,7 @@ public:
 	int m_Port;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	CEdit putkeyname;
+	int m_PointNum;
 };
 
 DWORD WINAPI RealProc(LPVOID lpParameter);

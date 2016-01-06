@@ -57,15 +57,12 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 	//  设置订阅信息，默认为空字符串，接受全部消息，不过滤
 	string empty;
 	zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, empty.c_str(), empty.length());
-	//int sndhwm = 0;
-	//zmq_setsockopt(subscriber, ZMQ_RCVHWM, &sndhwm, sizeof(int));
-	//cv::Mat i = cv::imread("D:\me.jpg");
-	////cv::resize(i,eyeImage,cv::Size(1440,900));
-	//i.copyTo(eyeImage);
+
 	CSingleLock lock(&m_crit);
 	int innum = 0;
-	vector<int> inx(10);
-	vector<int> iny(10);
+	vector<int> inx;
+	vector<int> iny;
+	vector<pair<int, int>> inxy;
 	while (true)
 	{
 		int gx=0, gy=0;
@@ -79,12 +76,10 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 		inx.push_back(gx);
 		iny.push_back(gy);
 
-		innum++;
-		TRACE("innum: %d\r\n", innum);
-
+		//粗略的给tobii数据平滑，取n个点的均值
+		innum++;	
 		if (innum == 10)
 		{
-			TRACE("innum == 10");
 			innum = 0;
 
 			int sumx = 0;
@@ -101,6 +96,14 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			gx = sumx / 10;
 			gy = sumy / 10;
 
+			//屏幕最多只留下m个点，清除一段时间前图像上留下的tobii视线。
+			if (inxy.size() == pWnd->m_PointNum)
+			{
+				inxy.erase(inxy.begin());
+			}
+
+			inxy.push_back(make_pair(gx, gy));
+
 			//获得pic设备相关类
 			CDC* pEyeDC = pWnd->GetDlgItem(IDC_STATIC_PPT)->GetDC();
 			//获得设备句柄
@@ -110,21 +113,25 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			CRect Eyerc;
 			pWnd->GetDlgItem(IDC_STATIC_PPT)->GetWindowRect(&Eyerc);
 
-			//在Mat上画屏幕点
-			//DrawAttentionPicture(eyeImage, pWnd->screendc.screenW, pWnd->screendc.screenH);
-			cv::Point eyeAttentionTmp(gx, gy);
-
 			CImage eyeCimg;
+			cv::Mat tempimg;
 
+			//给要访问的原始屏幕图像加锁。一是socket读入数据后会写Mat，二是这里会读，临界区
 			lock.Lock();
 			if (lock.IsLocked())
 			{
-				circle(eyeImage, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 6);
+				eyeImage.copyTo(tempimg);
 
-				pWnd->Mat2CImage(eyeImage, eyeCimg);
 				lock.Unlock();
 			}
 
+			for (size_t i = 0; i < inxy.size(); i++)
+			{
+				cv::Point eyeAttentionTmp(inxy[i].first, inxy[i].second);
+				circle(tempimg, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 6);
+			}
+
+			pWnd->Mat2CImage(tempimg, eyeCimg);
 			if (!eyeCimg.IsNull())
 			{
 				//Mat输出到pic
@@ -133,7 +140,7 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 
 			//释放Mat和设备相关类
 			eyeCimg.Destroy();
-			pWnd->ReleaseDC(pEyeDC);
+			pWnd->ReleaseDC(pEyeDC);			
 		}
 
 	}
@@ -175,6 +182,7 @@ DWORD WINAPI PptProc(LPVOID lpParameter)
 		{
 			//data_mat.copyTo(eyeImage);
 			cv::resize(data_mat,eyeImage,cv::Size(1440,900));
+
 			lock.Unlock();
 		}
 	}
@@ -260,8 +268,9 @@ END_MESSAGE_MAP()
 
 CmasterDlg::CmasterDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CmasterDlg::IDD, pParent)
-	, m_IP(3232252517)
+	, m_IP(2130706433)
 	, m_Port(5556)
+	, m_PointNum(3)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -270,8 +279,10 @@ void CmasterDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_IPAddress(pDX, IDC_IPADDRESS1, m_IP);
-	DDX_Text(pDX, IDC_EDIT1, m_Port);
+	//DDX_Text(pDX, IDC_EDIT1, m_Port);
 	DDX_Control(pDX, IDC_EDIT2, putkeyname);
+	DDX_Text(pDX, IDC_EDIT1, m_PointNum);
+	DDV_MinMaxInt(pDX, m_PointNum, 1, 10000);
 }
 
 BEGIN_MESSAGE_MAP(CmasterDlg, CDialogEx)
