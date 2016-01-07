@@ -46,13 +46,43 @@ ThreadParameter tp;
 //加锁
 CCriticalSection m_crit;
 
+void drawArrow(cv::Mat& img, cv::Point pStart, cv::Point pEnd, int len, int alpha,
+               cv::Scalar& color, int thickness, int lineType)
+{
+	const double PI = 3.1415926;
+    cv::Point arrow;
+	//计算 θ 角（最简单的一种情况在下面图示中已经展示，关键在于 atan2 函数，详情见下面）   
+	double angle = atan2((double)(pStart.y - pEnd.y), (double)(pStart.x - pEnd.x));
+	line(img, pStart, pEnd, color, thickness, lineType);
+	//计算箭角边的另一端的端点位置（上面的还是下面的要看箭头的指向，也就是pStart和pEnd的位置） 
+
+	//将箭头放在中间，取start和end均值
+	cv::Point center((pStart.x + pEnd.x) / 2, (pStart.y + pEnd.y) / 2);
+
+	arrow.x = center.x + len * cos(angle + PI * alpha / 180);
+	arrow.y = center.y + len * sin(angle + PI * alpha / 180);
+	line(img, center, arrow, color, thickness, lineType);
+	arrow.x = center.x + len * cos(angle - PI * alpha / 180);
+	arrow.y = center.y + len * sin(angle - PI * alpha / 180);
+	line(img, center, arrow, color, thickness, lineType);
+
+}
+
+void DrawTransRec(IplImage* img, int x, int y, int width, int height, CvScalar color, double alpha)
+{
+	IplImage * rec = cvCreateImage(cvSize(width, height), img->depth, img->nChannels);
+	cvRectangle(rec, cvPoint(0, 0), cvPoint(width, height), color, -1);
+	cvSetImageROI(img, cvRect(x, y, width, height));
+	cvAddWeighted(img, alpha, rec, 1 - alpha, 0.0, img);
+	cvResetImageROI(img);
+}
+
 //线程入口
 
 //接收学生实时画面数据，展示
 
 DWORD WINAPI EyeProc(LPVOID lpParameter)
 {
-
 	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
 	CmasterDlg *pWnd = tp->ceye;
 	string serveripport = tp->Eyeip;
@@ -132,11 +162,29 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 				lock.Unlock();
 			}
 
+			//画眼睛点
 			for (size_t i = 0; i < inxy.size(); i++)
 			{
+				//画点
 				cv::Point eyeAttentionTmp(inxy[i].first, inxy[i].second);
-				circle(tempimg, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 6);
+				//circle(tempimg, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 2);
+				//画矩形
+				DrawTransRec(&(IplImage)(tempimg), eyeAttentionTmp.x - 20, eyeAttentionTmp.y - 20, 40, 40, cv::Scalar(255, 0, 0), 0.85);
+				//DrawTransRec(pImage, 150, 150, 150, 150, CV_RGB(255, 0, 0), 0.5);
 			}
+
+			//画点与点之间直线
+			for (size_t i = 0; i < inxy.size()-1; i++)
+			{
+				cv::Point pt1(inxy[i].first, inxy[i].second);
+				cv::Point pt2(inxy[i+1].first, inxy[i+1].second);
+
+				drawArrow(tempimg, pt1, pt2, 17,35,cv::Scalar(255, 0, 0), 2,8);
+				/*cv::line(tempimg, pt1, pt2, cv::Scalar(255, 0, 0), 10);
+				arrowedLine(tempimg, pt1, pt2, cv::Scalar(255, 0, 0), 10);*/
+				
+			}
+
 
 			pWnd->Mat2CImage(tempimg, eyeCimg);
 			if (!eyeCimg.IsNull())
