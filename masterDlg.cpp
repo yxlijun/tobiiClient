@@ -584,6 +584,7 @@ void CmasterDlg::OnSize(UINT nType, int cx, int cy)
 	{
 		ReSize();
 	}
+	Invalidate();
 }
 
 void CmasterDlg::ReSize()
