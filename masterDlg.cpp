@@ -46,6 +46,7 @@ ThreadParameter tp;
 //加锁
 CCriticalSection m_crit;
 
+//画箭头
 void drawArrow(cv::Mat& img, cv::Point pStart, cv::Point pEnd, int len, int alpha,
                cv::Scalar& color, int thickness, int lineType)
 {
@@ -68,14 +69,31 @@ void drawArrow(cv::Mat& img, cv::Point pStart, cv::Point pEnd, int len, int alph
 
 }
 
+//将矩形半透明化
 void DrawTransRec(IplImage* img, int x, int y, int width, int height, CvScalar color, double alpha)
 {
-	IplImage * rec = cvCreateImage(cvSize(width, height), img->depth, img->nChannels);
-	cvRectangle(rec, cvPoint(0, 0), cvPoint(width, height), color, -1);
-	cvSetImageROI(img, cvRect(x, y, width, height));
-	cvAddWeighted(img, alpha, rec, 1 - alpha, 0.0, img);
-	cvResetImageROI(img);
+	IplImage * rec;
+	try
+	{
+		TRACE("begin cvCreateImage\r\n");
+		rec = cvCreateImage(cvSize(width, height), img->depth, img->nChannels);
+		TRACE("begin cvRectangle\r\n");
+		cvRectangle(rec, cvPoint(0, 0), cvPoint(width, height), color, -1);
+		TRACE("begin cvSetImageROI\r\n");
+		cvSetImageROI(img, cvRect(x, y, width, height));
+		TRACE("begin cvAddWeighted\r\n");
+		//使用addWeighted函数时，两个图像尺寸要一致，否则会报内存错误
+		cvAddWeighted(img, alpha, rec, 1 - alpha, 0.0, img);
+		TRACE("begin cvResetImageROI\r\n");
+		cvResetImageROI(img);
+	}
+	catch (...)
+	{
+		return;
+	}
+	
 }
+
 
 //线程入口
 
@@ -167,9 +185,10 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			{
 				//画点
 				cv::Point eyeAttentionTmp(inxy[i].first, inxy[i].second);
-				//circle(tempimg, eyeAttentionTmp, 20, cv::Scalar(255, 0, 0), 2);
+				circle(tempimg, eyeAttentionTmp, 40, cv::Scalar(190, 190, 190), 2);
 				//画矩形
-				DrawTransRec(&(IplImage)(tempimg), eyeAttentionTmp.x - 20, eyeAttentionTmp.y - 20, 40, 40, cv::Scalar(255, 0, 0), 0.85);
+				//DrawTransRec(&(IplImage)(tempimg), eyeAttentionTmp.x - 20, eyeAttentionTmp.y - 20, 40, 40, cv::Scalar(255, 0, 0), 0.85);
+				//DrawTransRec((tempimg), eyeAttentionTmp.x - 20, eyeAttentionTmp.y - 20, 40, 40, cv::Scalar(255, 0, 0), 0.85);
 				//DrawTransRec(pImage, 150, 150, 150, 150, CV_RGB(255, 0, 0), 0.5);
 			}
 
