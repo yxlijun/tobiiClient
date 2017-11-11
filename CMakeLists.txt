@@ -14,12 +14,11 @@ if(MSVC)
     SET(CMAKE_MFC_FLAG 2)
 endif()
 
-#FIND_PACKAGE(ZeroMQ REQUIRED)
-INCLUDE_DIRECTORIES(SYSTEM "D:/Program Files (x86)/ZeroMQ 4.0.4/include")
-LINK_DIRECTORIES(SYSTEM "D:/Program Files (x86)/ZeroMQ 4.0.4/lib")
-
-#FIND_PACKAGE(zguide C REQUIRED)
-INCLUDE_DIRECTORIES(SYSTEM "E:/GIT/zguide/examples/C")
+INCLUDE_DIRECTORIES("E:/code/tobiiProject/ZeroMQ 4.0.4/include")
+LINK_DIRECTORIES("E:/code/tobiiProject/ZeroMQ 4.0.4/lib")
+INCLUDE_DIRECTORIES("E:/code/tobiiProject/zguide/examples/C")
+INCLUDE_DIRECTORIES("E:/code/tobiiProject/tobii-eyex-sdk/include/eyex")
+LINK_DIRECTORIES("E:/code/tobiiProject/tobii-eyex-sdk/lib/x86")
 
 # add c++11 flags for gcc
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -35,5 +34,5 @@ include_directories(.)
 file(GLOB SOURCE *.h* *.c* *.rc)
 #INCLUDE_DIRECTORIES(SYSTEM ${SimpleAmqpClient_INCLUDE_DIRS})
 
-add_executable(${PROJECT_NAME} ${SOURCE} WIN32)
+add_executable(${PROJECT_NAME} ${SOURCE})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} libzmq-v120-mt-gd-4_0_4 )

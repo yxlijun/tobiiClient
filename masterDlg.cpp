@@ -1,21 +1,36 @@
 
 // masterDlg.cpp : 实现文件
 //
-
+static char THIS_FILE[] = __FILE__;
+#undef THIS_FILE
 #include "stdafx.h"
 #include "master.h"
 #include "masterDlg.h"
+#include  "resource.h"
 #include "afxdialogex.h"
-
+#include "CvvImage.h"
 #include <iostream>
 #include <string>
 #include <zmq.h>
 #include <zhelpers.h>
+#include<math.h>//数学函数库的头文件
+#include<Vfw.h>//增加AVI视频处理函数的头文件
+#pragma comment(lib,"Vfw32.lib")//连接库Vfw32.lib
+#pragma comment(lib,"Winmm.lib")//链接库
+//定义AVI视频处理函数所需的结构体变量
+using namespace std;
+HRESULT hr;
+CImage eyeCimg;
+
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
+HANDLE hThread_2;
+HANDLE hThread_3;
+HANDLE hThread_4;
+HANDLE hThread_5;
+HANDLE hThread_6;
 using namespace std;
 
 #define realsize 816000
@@ -48,10 +63,10 @@ CCriticalSection m_crit;
 
 //画箭头
 void drawArrow(cv::Mat& img, cv::Point pStart, cv::Point pEnd, int len, int alpha,
-               cv::Scalar& color, int thickness, int lineType)
+	cv::Scalar& color, int thickness, int lineType)
 {
 	const double PI = 3.1415926;
-    cv::Point arrow;
+	cv::Point arrow;
 	//计算 θ 角（最简单的一种情况在下面图示中已经展示，关键在于 atan2 函数，详情见下面）   
 	double angle = atan2((double)(pStart.y - pEnd.y), (double)(pStart.x - pEnd.x));
 	line(img, pStart, pEnd, color, thickness, lineType);
@@ -75,7 +90,7 @@ void DrawTransRec(IplImage* img, int x, int y, int width, int height, CvScalar c
 	IplImage * rec;
 	try
 	{
-		TRACE("begin cvCreateImage\r\n");
+		TRACE("begin cvCreateImage\r\n");  //打印，相当于print
 		rec = cvCreateImage(cvSize(width, height), img->depth, img->nChannels);
 		TRACE("begin cvRectangle\r\n");
 		cvRectangle(rec, cvPoint(0, 0), cvPoint(width, height), color, -1);
@@ -91,7 +106,7 @@ void DrawTransRec(IplImage* img, int x, int y, int width, int height, CvScalar c
 	{
 		return;
 	}
-	
+
 }
 
 
@@ -101,6 +116,20 @@ void DrawTransRec(IplImage* img, int x, int y, int width, int height, CvScalar c
 
 DWORD WINAPI EyeProc(LPVOID lpParameter)
 {
+	CmasterDlg *pDlg = (CmasterDlg*)(AfxGetApp()->GetMainWnd());
+	CRect rect1;
+	pDlg->GetDlgItem(IDC_STATIC_PPT)->GetWindowRect(&rect1);//获取控件相对于屏幕的位置
+	pDlg->ScreenToClient(rect1);//转化为对话框上的相对位置
+
+	CClientDC dc(pDlg);
+	dc.SelectStockObject(NULL_BRUSH);
+	CPen pen(PS_SOLID, 1, RGB(255, 0, 0));
+	DeleteObject(dc.SelectObject(pen));
+	//dc.SetROP2(R2_XORPEN);
+	float rwidth = (float)rect1.Width();
+	float rheight = (float)rect1.Height();
+	float xscale = 1440 / rwidth;
+	float yscale = 900 / rheight;
 	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
 	CmasterDlg *pWnd = tp->ceye;
 	string serveripport = tp->Eyeip;
@@ -120,7 +149,7 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 	vector<pair<int, int>> inxy;
 	while (true)
 	{
-		int gx=0, gy=0;
+		int gx = 0, gy = 0;
 
 		char *re = s_recv(subscriber);
 
@@ -131,10 +160,12 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 		inx.push_back(gx);
 		iny.push_back(gy);
 
+
 		//粗略的给tobii数据平滑，取n个点的均值
-		innum++;	
+		innum++;
 		if (innum == 10)
 		{
+
 			innum = 0;
 
 			int sumx = 0;
@@ -150,6 +181,8 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 
 			gx = sumx / 10;
 			gy = sumy / 10;
+			int gx1 = (int)gx / xscale;
+			int gy1 = (int)gy / yscale;
 
 			//屏幕最多只留下m个点，清除一段时间前图像上留下的tobii视线。
 			if (inxy.size() == pWnd->m_PointNum)
@@ -175,10 +208,11 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			lock.Lock();
 			if (lock.IsLocked())
 			{
-				eyeImage.copyTo(tempimg);
 
+				eyeImage.copyTo(tempimg);
 				lock.Unlock();
 			}
+
 
 			//画眼睛点
 			for (size_t i = 0; i < inxy.size(); i++)
@@ -193,15 +227,15 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			}
 
 			//画点与点之间直线
-			for (size_t i = 0; i < inxy.size()-1; i++)
+			for (size_t i = 0; i < inxy.size() - 1; i++)
 			{
 				cv::Point pt1(inxy[i].first, inxy[i].second);
-				cv::Point pt2(inxy[i+1].first, inxy[i+1].second);
+				cv::Point pt2(inxy[i + 1].first, inxy[i + 1].second);
 
-				drawArrow(tempimg, pt1, pt2, 17,35,cv::Scalar(255, 0, 0), 2,8);
+				drawArrow(tempimg, pt1, pt2, 17, 35, cv::Scalar(255, 0, 0), 2, 8);
 				/*cv::line(tempimg, pt1, pt2, cv::Scalar(255, 0, 0), 10);
 				arrowedLine(tempimg, pt1, pt2, cv::Scalar(255, 0, 0), 10);*/
-				
+
 			}
 
 
@@ -214,7 +248,8 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 
 			//释放Mat和设备相关类
 			eyeCimg.Destroy();
-			pWnd->ReleaseDC(pEyeDC);			
+			pWnd->ReleaseDC(pEyeDC);
+
 		}
 
 	}
@@ -226,6 +261,16 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 
 DWORD WINAPI PptProc(LPVOID lpParameter)
 {
+	CmasterDlg *pDlg = (CmasterDlg*)(AfxGetApp()->GetMainWnd());
+	CRect rect1;
+	pDlg->GetDlgItem(IDC_STATIC_PPT)->GetWindowRect(&rect1);//获取控件相对于屏幕的位置
+	pDlg->ScreenToClient(rect1);//转化为对话框上的相对位置
+
+	CClientDC dc(pDlg);
+	dc.SelectStockObject(NULL_BRUSH);
+	CPen pen(PS_SOLID, 1, RGB(255, 0, 0));
+	DeleteObject(dc.SelectObject(pen));
+	//dc.SetROP2(R2_XORPEN);
 
 	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
 	CmasterDlg *pWnd = tp->ceye;
@@ -249,14 +294,13 @@ DWORD WINAPI PptProc(LPVOID lpParameter)
 		//*(re + 3888000) = 0;
 
 		cv::Mat data_mat = cv::Mat(ppthight2, pptwidth2, CV_8UC3, (void *)re);
-
+		TRACE("%d", len);
 		lock.Lock();
 
 		if (lock.IsLocked())
 		{
 			//data_mat.copyTo(eyeImage);
-			cv::resize(data_mat,eyeImage,cv::Size(1440,900));
-
+			cv::resize(data_mat, eyeImage, cv::Size(1440, 900));
 			lock.Unlock();
 		}
 	}
@@ -298,7 +342,7 @@ DWORD WINAPI KeyProc(LPVOID lpParameter)
 			//pWnd->UpdateData(FALSE);
 			TRACE("%s\r\n", str);
 		}
-		
+
 		free(re);
 	}
 
@@ -308,6 +352,8 @@ DWORD WINAPI KeyProc(LPVOID lpParameter)
 	return 0;
 }
 
+
+
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
 class CAboutDlg : public CDialogEx
@@ -315,13 +361,13 @@ class CAboutDlg : public CDialogEx
 public:
 	CAboutDlg();
 
-// 对话框数据
+	// 对话框数据
 	enum { IDD = IDD_ABOUTBOX };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
-// 实现
+	// 实现
 protected:
 	DECLARE_MESSAGE_MAP()
 };
@@ -456,8 +502,13 @@ void CmasterDlg::OnPaint()
 	}
 	else
 	{
+		CClientDC dc(this);
+		dc.SetROP2(R2_NOTXORPEN);
+		dc.SelectStockObject(NULL_BRUSH);
+		dc.Rectangle(CRect(regionLeftTopTemp, regionRightBottomTemp));
 		CDialogEx::OnPaint();
 	}
+
 }
 
 //当用户拖动最小化窗口时系统调用此函数取得光标
@@ -472,9 +523,7 @@ HCURSOR CmasterDlg::OnQueryDragIcon()
 void CmasterDlg::OnBnClickedOk()
 {
 	// TODO:  在此添加控件通知处理程序代码
-
-	UpdateData(TRUE);
-
+	UpdateData(true);
 	unsigned short usIPa, usIPb, usIPc, usIPd;
 	usIPa = (m_IP & (0xff << 24)) >> 24;
 	usIPb = (m_IP & (0xff << 16)) >> 16;
@@ -489,12 +538,11 @@ void CmasterDlg::OnBnClickedOk()
 	//string Realport = std::to_string(m_Port);
 	string Eyeport = std::to_string(m_Port + 1);
 	string Pptport = std::to_string(m_Port + 2);
-
+	//string Screenport = std::to_string(m_Port + 3);
 	//string serveripRealprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Realport;
 	string serveripEyeprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Eyeport;
 	string serveripPptprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Pptport;
 	string serveripKeyprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":5555";
-
 	//将对话框的对象指针CeyeDlg作为参数传入给线程
 	tp.ceye = this;
 
@@ -503,15 +551,16 @@ void CmasterDlg::OnBnClickedOk()
 	//HANDLE hThread_1 = CreateThread(NULL, 0, RealProc, &tp, 0, NULL);
 
 	tp.Eyeip = serveripEyeprot;
-	HANDLE hThread_2 = CreateThread(NULL, 0, EyeProc, &tp, 0, NULL);
+	hThread_2 = CreateThread(NULL, 0, EyeProc, &tp, 0, NULL);
 
 	tp.Pptip = serveripPptprot;
-	HANDLE hThread_3 = CreateThread(NULL, 0, PptProc, &tp, 0, NULL);
+	hThread_3 = CreateThread(NULL, 0, PptProc, &tp, 0, NULL);
 
 	tp.Keyip = serveripKeyprot;
-	HANDLE hThread_4 = CreateThread(NULL, 0, KeyProc, &tp, 0, NULL);
+	hThread_4 = CreateThread(NULL, 0, KeyProc, &tp, 0, NULL);
 
-	GetDlgItem(IDOK)->EnableWindow(FALSE);
+
+	//GetDlgItem(IDOK)->EnableWindow(FALSE);
 
 	//CDialogEx::OnOK();
 }
@@ -619,3 +668,6 @@ void CmasterDlg::ReSize()
 	}
 	old = Newp;
 }
+
+
+
