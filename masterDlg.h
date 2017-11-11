@@ -64,7 +64,9 @@ DWORD WINAPI EyeProc(LPVOID lpParameter);
 
 DWORD WINAPI PptProc(LPVOID lpParameter);
 
-DWORD WINAPI KeyProc(LPVOID lpParameter);
+//DWORD WINAPI KeyProc(LPVOID lpParameter);
+
+DWORD WINAPI ScreenSizeProc(LPVOID lpParameter);
 
 
 struct ThreadParameter{

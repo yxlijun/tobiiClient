@@ -38,8 +38,10 @@ using namespace std;
 #define matwidth    600
 
 #define pptsize  3888000
-#define ppthight 900
-#define pptwidth 1440
+//#define ppthight 1080
+//#define pptwidth 1920
+int pptheight = 1080;
+int pptwidth = 1920;
 
 #define pptsize2  612000
 #define ppthight2 340
@@ -154,7 +156,7 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 		char *re = s_recv(subscriber);
 
 		sscanf(re, "%d %d", &gx, &gy);
-		TRACE("gx: %d\n", gx);
+		//TRACE("gx: %d\n", gx);
 		free(re);
 
 		inx.push_back(gx);
@@ -184,6 +186,7 @@ DWORD WINAPI EyeProc(LPVOID lpParameter)
 			int gx1 = (int)gx / xscale;
 			int gy1 = (int)gy / yscale;
 
+			//TRACE("gx: %d,%d\n", gx,gy);
 			//屏幕最多只留下m个点，清除一段时间前图像上留下的tobii视线。
 			if (inxy.size() == pWnd->m_PointNum)
 			{
@@ -294,13 +297,13 @@ DWORD WINAPI PptProc(LPVOID lpParameter)
 		//*(re + 3888000) = 0;
 
 		cv::Mat data_mat = cv::Mat(ppthight2, pptwidth2, CV_8UC3, (void *)re);
-		TRACE("%d", len);
+		//TRACE("%d", len);
 		lock.Lock();
 
 		if (lock.IsLocked())
 		{
 			//data_mat.copyTo(eyeImage);
-			cv::resize(data_mat, eyeImage, cv::Size(1440, 900));
+			cv::resize(data_mat, eyeImage, cv::Size(1920, 1080));
 			lock.Unlock();
 		}
 	}
@@ -311,7 +314,48 @@ DWORD WINAPI PptProc(LPVOID lpParameter)
 	return 0;
 }
 
-DWORD WINAPI KeyProc(LPVOID lpParameter)
+//DWORD WINAPI KeyProc(LPVOID lpParameter)
+//{
+//	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
+//	CmasterDlg *pWnd = tp->ceye;
+//	string serveripport = tp->Keyip;
+//
+//	void *context = zmq_init(1);
+//	void *subscriber = zmq_socket(context, ZMQ_SUB);
+//	zmq_connect(subscriber, serveripport.c_str());
+//
+//	//  设置订阅信息，默认为空字符串，接受全部消息，不过滤
+//	string empty;
+//	zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, empty.c_str(), empty.length());
+//	//int sndhwm = 0;
+//	//zmq_setsockopt(subscriber, ZMQ_RCVHWM, &sndhwm, sizeof(int));
+//
+//	while (true)
+//	{
+//		char str[20];
+//		int key1 = 0;
+//		int key2 = 0;
+//		char *re = s_recv(subscriber);
+//
+//		sscanf(re, "%d %d %s", &key1, &key2, &str);
+//		CString keyname(str);
+//		if (key1 == KeyDownMessege)
+//		{
+//			pWnd->putkeyname.SetWindowTextW(keyname);
+//			//pWnd->UpdateData(FALSE);
+//			TRACE("%s\r\n", str);
+//		}
+//
+//		free(re);
+//	}
+//
+//	zmq_close(subscriber);
+//	zmq_term(context);
+//
+//	return 0;
+//}
+
+DWORD WINAPI ScreenSizeProc(LPVOID lpParameter)
 {
 	ThreadParameter *tp = static_cast<ThreadParameter *>(lpParameter);
 	CmasterDlg *pWnd = tp->ceye;
@@ -329,20 +373,16 @@ DWORD WINAPI KeyProc(LPVOID lpParameter)
 
 	while (true)
 	{
-		char str[20];
-		int key1 = 0;
-		int key2 = 0;
+		int Width = 0;
+		int Height = 0;
 		char *re = s_recv(subscriber);
 
-		sscanf(re, "%d %d %s", &key1, &key2, &str);
-		CString keyname(str);
-		if (key1 == KeyDownMessege)
-		{
-			pWnd->putkeyname.SetWindowTextW(keyname);
-			//pWnd->UpdateData(FALSE);
-			TRACE("%s\r\n", str);
-		}
+		sscanf(re, "%d %d", &Width, &Height);
+		
+		TRACE("%d%d", Width, Height);
 
+		pptwidth = Width;
+		pptheight = Height;
 		free(re);
 	}
 
@@ -538,11 +578,13 @@ void CmasterDlg::OnBnClickedOk()
 	//string Realport = std::to_string(m_Port);
 	string Eyeport = std::to_string(m_Port + 1);
 	string Pptport = std::to_string(m_Port + 2);
+	string Screenport = std::to_string(m_Port + 3);
+
 	//string Screenport = std::to_string(m_Port + 3);
 	//string serveripRealprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Realport;
 	string serveripEyeprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Eyeport;
 	string serveripPptprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":" + Pptport;
-	string serveripKeyprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd + ":5555";
+	string serveripKeyprot = "tcp://" + sIPa + "." + sIPb + "." + sIPc + "." + sIPd +":"+ Screenport;
 	//将对话框的对象指针CeyeDlg作为参数传入给线程
 	tp.ceye = this;
 
@@ -556,9 +598,10 @@ void CmasterDlg::OnBnClickedOk()
 	tp.Pptip = serveripPptprot;
 	hThread_3 = CreateThread(NULL, 0, PptProc, &tp, 0, NULL);
 
+	/*tp.Keyip = serveripKeyprot;
+	hThread_4 = CreateThread(NULL, 0, KeyProc, &tp, 0, NULL);*/
 	tp.Keyip = serveripKeyprot;
-	hThread_4 = CreateThread(NULL, 0, KeyProc, &tp, 0, NULL);
-
+	hThread_4 = CreateThread(NULL, 0, ScreenSizeProc, &tp, 0, NULL);
 
 	//GetDlgItem(IDOK)->EnableWindow(FALSE);
 
