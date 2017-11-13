@@ -43,9 +43,13 @@ using namespace std;
 int pptheight = 1080;
 int pptwidth = 1920;
 
-#define pptsize2  612000
-#define ppthight2 340
-#define pptwidth2 600
+//#define pptsize2  612000
+//#define ppthight2 340
+//#define pptwidth2 600
+
+#define pptsize2  6220800
+#define ppthight2 1080
+#define pptwidth2 1920
 
 const int MouseMoveMessege = 512;
 const int MouseLeftDownMessege = 513;
@@ -303,7 +307,7 @@ DWORD WINAPI PptProc(LPVOID lpParameter)
 		if (lock.IsLocked())
 		{
 			//data_mat.copyTo(eyeImage);
-			cv::resize(data_mat, eyeImage, cv::Size(1920, 1080));
+			cv::resize(data_mat, eyeImage, cv::Size(pptwidth,pptheight));
 			lock.Unlock();
 		}
 	}
